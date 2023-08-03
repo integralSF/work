@@ -1,0 +1,3 @@
+# ninja log v5
+0	15963	1690943824262123800	/home/zjh/workspace/PFNet/tools/chamfer3D/build/temp.linux-x86_64-cpython-38/chamfer3D.o	d6aa00d81ef78a1c
+0	21418	1690943829712123800	/home/zjh/workspace/PFNet/tools/chamfer3D/build/temp.linux-x86_64-cpython-38/chamfer_cuda.o	b91a2b617d10dccc
