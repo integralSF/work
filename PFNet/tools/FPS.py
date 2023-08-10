@@ -55,17 +55,17 @@ if __name__ == "__main__":
     # # 将PointCloud对象保存为ply文件
 
     # o3d.io.write_point_cloud("/mnt/d/temp/p9/22.ply", pcd)
-    
+    count = 0
     name_list = ["1-incisor","2-canine","3-premolares", "4-molars"]
     for name in name_list:
         print("gt current :", name)
-        path = f"/home/zjh/workspace/PFNet/dataset/own_dataset_pure/{name}/gt"
-        save_path = f"/home/zjh/workspace/PFNet/dataset/own_dataset_processed/train/gt/{name}/"
+        path = f"/home/zjh/workspace/workspace-git/PFNet/dataset/test_dataset/{name}/gt"
+        save_path = f"/home/zjh/workspace/workspace-git/PFNet/dataset/test_dataset_processed/train/gt/{name}/"
         file_names = os.listdir(path)
         pbar1 = tqdm(total=len(file_names), desc="Running GT FPS")
         for i in file_names:
             pbar1.update(1)
-            
+            count += 1
             file_name = os.path.join(path, i)
             file_class_name = i[:-4] + '.pts'
             file_save = os.path.join(save_path, file_class_name)
@@ -78,27 +78,27 @@ if __name__ == "__main__":
             np.savetxt(file_save, fps_data_np, delimiter=" ")
         pbar1.close()
         print("------------------------")
-    print("=================")
+    print(f"======={count}=========")
         
         
-    for name in name_list:
-        print("partial current :", name)
-        path = f"/home/zjh/workspace/PFNet/dataset/own_dataset_pure/{name}/partial"
-        save_path = f"/home/zjh/workspace/PFNet/dataset/own_dataset_processed/train/partial/{name}/"
-        file_names = os.listdir(path)
-        pbar2 = tqdm(total=len(file_names), desc="Running Partial FPS")
-        for i in file_names:
-            pbar2.update(1)
+    # for name in name_list:
+    #     print("partial current :", name)
+    #     path = f"/home/zjh/workspace/workspace-git/PFNet/dataset/own_dataset_pure/{name}/partial"
+    #     save_path = f"/home/zjh/workspace/workspace-git/PFNet/dataset/own_dataset_processed/train/partial/{name}/"
+    #     file_names = os.listdir(path)
+    #     pbar2 = tqdm(total=len(file_names), desc="Running Partial FPS")
+    #     for i in file_names:
+    #         pbar2.update(1)
             
-            file_name = os.path.join(path, i)
-            file_class_name = i[:-4] + '.pts'
-            file_save = os.path.join(save_path, file_class_name)
+    #         file_name = os.path.join(path, i)
+    #         file_class_name = i[:-4] + '.pts'
+    #         file_save = os.path.join(save_path, file_class_name)
     
-            data = read_data(path=file_name)
+    #         data = read_data(path=file_name)
             
-            fps_data_torch = farthest_point_sample(data, 2232)
+    #         fps_data_torch = farthest_point_sample(data, 2048)
 
-            fps_data_np = fps_data_torch.numpy()
-            np.savetxt(file_save, fps_data_np, delimiter=" ")
-        pbar2.close()
-        print("------------------------")
+    #         fps_data_np = fps_data_torch.numpy()
+    #         np.savetxt(file_save, fps_data_np, delimiter=" ")
+    #     pbar2.close()
+    #     print("------------------------")
