@@ -51,5 +51,5 @@ if __name__ == "__main__":# 60-24 62-26 140-45
     # import sys
     # if len(sys.argv) != 3:
     #     print(f"Usage: {sys.argv[0]} <input.pts> <output.pts>")
-    #     sys.exit(1);
+    #     sys.exit(1)
     # main(sys.argv[1], sys.argv[2])
