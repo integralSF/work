@@ -3,28 +3,31 @@ from FPS import *
 from tqdm import tqdm
 import time
 
-idx = 50
-p = "p10"
-num = "34"
-
-pbar1 = tqdm(total=10, desc="Running PROCESS PIPELINE")
+idx = 140
+p = "p16"
+#       记得换idx
+num = "46" # 记得换idx 44 45 46 
+#       记得换idx
+pbar1 = tqdm(total=10, desc=f"{num} Running PROCESS PIPELINE")
 
 pbar1.update(1)
 time.sleep(0.05)
 
 root_path = f'/mnt/d/orthtest/'
+path = ''
 all_teeths = os.listdir(root_path)
 for teeth in all_teeths:
    if teeth[-6:-4] == num:
        path = os.path.join(root_path, teeth)
        break
-  
+if not path:
+    raise Exception('no path exist')
 data = read_data(path=path)
 
 pbar1.update(1)
 time.sleep(0.05)
 
-fps_data_torch = farthest_point_sample(data, 822)
+fps_data_torch = farthest_point_sample(data, 888)
 
 pbar1.update(1)
 time.sleep(0.05)
@@ -57,7 +60,7 @@ points1 = np.asarray(cloud1.points)
 points2 = np.asarray(cloud2.points)
 
 # 计算距离并剔除距离近的点
-threshold = 0.4
+threshold = 0.33
 
 pbar1.update(1)
 time.sleep(0.05)
@@ -80,4 +83,4 @@ pbar1.update(1)
 time.sleep(0.05)
 
 
-# pbar1.close()
+pbar1.close()

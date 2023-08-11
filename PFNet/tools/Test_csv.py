@@ -9,21 +9,23 @@ import argparse
 import torch
 import torch.nn.parallel
 import torch.utils.data
-import torchvision.transforms as transforms
 import sys
-sys.path.append("/home/zjh/workspace/PFNet/")
+sys.path.append("/home/zjh/workspace/workspace-git/PFNet/")
 import utils
 from utils import PointLoss
 
 from model_PFNet import _netlocalD,_netG
 
+model_num = '8'
+model_iter = '200'
+data_num = '62-26' # 60-24 62-26 140-45
 
 parser = argparse.ArgumentParser()
 #parser.add_argument('--dataset',  default='ModelNet40', help='ModelNet10|ModelNet40|ShapeNet')
 parser.add_argument('--dataroot',  default='dataset/train', help='path to dataset')
 parser.add_argument('--workers', type=int,default=0, help='number of data loading workers')
 parser.add_argument('--batchSize', type=int, default=1, help='input batch size')
-parser.add_argument('--pnum', type=int, default=2232, help='the point number of a sample')
+parser.add_argument('--pnum', type=int, default=4000, help='the point number of a sample')
 parser.add_argument('--crop_point_num',type=int,default=768,help='0 means do not use else use with this weight')
 parser.add_argument('--nc', type=int, default=3)
 parser.add_argument('--niter', type=int, default=401, help='number of epochs to train for')
@@ -32,15 +34,15 @@ parser.add_argument('--learning_rate', default=0.0002, type=float, help='learnin
 parser.add_argument('--beta1', type=float, default=0.9, help='beta1 for adam. default=0.9')
 parser.add_argument('--cuda', type = bool, default = False, help='enables cuda')
 parser.add_argument('--ngpu', type=int, default=2, help='number of GPUs to use')
-parser.add_argument('--netG', default='checkpoint/Trained_Model_2/point_netG600.pth', help="path to netG (to continue training)")
-parser.add_argument('--infile',type = str, default = 'dataset/own_dataset_processed/train/partial/4-molars/molars-partial-48-27.pts')
-parser.add_argument('--infile_real',type = str, default = 'dataset/own_dataset_processed/train/gt/4-molars/molars-gt-48-27.pts')
+parser.add_argument('--netG', default=f'./checkpoint/Trained_Model_{model_num}/point_netG{model_iter}.pth', help="path to netG (to continue training)")
+parser.add_argument('--infile',type = str, default = f'./test_one/partial-normalize-{data_num}.txt')
+parser.add_argument('--infile_real',type = str, default = f'./test_one/gt-normalize-{data_num}.txt')
 parser.add_argument('--netD', default='', help="path to netD (to continue training)")
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 parser.add_argument('--drop',type=float,default=0.2)
 parser.add_argument('--num_scales',type=int,default=3,help='number of scales')
 # If you want to test your point clouds.  Set the first parameter of '--point_scales_list' equal to (point_number + 512).
-parser.add_argument('--point_scales_list',type=list,default=[2232,1500,768],help='number of points in each scales')
+parser.add_argument('--point_scales_list',type=list,default=[4000,2000,1000],help='number of points in each scales')
 parser.add_argument('--each_scales_size',type=int,default=1,help='each scales size')
 parser.add_argument('--wtl2',type=float,default=0.9,help='0 means do not use else use with this weight')
 parser.add_argument('--cropmethod', default = 'random_center', help = 'random|center|random_center')
@@ -121,8 +123,8 @@ input_cropped1 = input_cropped1.cpu()
 np_crop = input_cropped1[0].numpy() 
 
 
-np.savetxt('test_one/input'+'.txt', np_crop, fmt = "%f %f %f")
-np.savetxt('test_one/output'+'.txt', np_fake, fmt = "%f %f %f")
-np.savetxt('test_one/gt'+'.txt', np_real, fmt = "%f %f %f")
+# np.savetxt('test_one/np_crop'+'.txt', np_crop, fmt = "%f %f %f")
+np.savetxt(f'test_one/{model_num}/{model_num}_{data_num}_test_output_normalize_fake_new200'+'.txt', np_fake, fmt = "%f %f %f")
+# np.savetxt('test_one/np_real'+'.txt', np_real, fmt = "%f %f %f")
 # np.savetxt('test_one/real_ours_txt1'+'.txt', np_real, fmt = "%f,%f,%f")
 # np.savetxt('test_one/real_ours_txt3'+'.txt', np_real, fmt = "%f,%f,%f")

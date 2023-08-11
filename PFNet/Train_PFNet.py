@@ -6,7 +6,6 @@ import torch
 import torch.nn.parallel
 import torch.backends.cudnn as cudnn
 import torch.utils.data
-import torchvision.transforms as transforms
 from torch.autograd import Variable
 import utils
 from utils import PointLoss
@@ -45,31 +44,29 @@ vis_g.line([0.], # Y的第一个点的坐标
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataroot',  default='dataset/train', help='path to dataset')
 parser.add_argument('--workers', type=int,default=0, help='number of data loading workers')
-parser.add_argument('--batchSize', type=int, default=2, help='input batch size')
-parser.add_argument('--pnum', type=int, default=2232, help='the point number of a sample')
+parser.add_argument('--batchSize', type=int, default=5, help='input batch size')
+parser.add_argument('--pnum', type=int, default=4000, help='the point number of a sample')
 parser.add_argument('--crop_point_num',type=int,default=768,help='0 melearning_ratelrrans do not use else use with this weight')
 parser.add_argument('--nc', type=int, default=3)
 parser.add_argument('--niter', type=int, default=801, help='number of epochs to train for')
-parser.add_argument('--weight_decay', type=float, default=0.001)
+parser.add_argument('--weight_decay', type=float, default=0.0001)
 parser.add_argument('--learning_rate', default=0.001, type=float, help='learning rate in training')
 parser.add_argument('--beta1', type=float, default=0.9, help='beta1 for adam. default=0.9')
 parser.add_argument('--cuda', type = bool, default = False, help='enables cuda')
 parser.add_argument('--ngpu', type=int, default=2, help='number of GPUs to use')
 parser.add_argument('--D_choose',type=int, default=1, help='0 not use D-net,1 use D-net')
-parser.add_argument('--netG', default='', help="path to netG (to continue training)")
-parser.add_argument('--netD', default='', help="path to netD (to continue training)")
+parser.add_argument('--netG', default='', help="fuck you")
+parser.add_argument('--netD', default='', help="fuck")
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 parser.add_argument('--drop',type=float,default=0.2)
 parser.add_argument('--num_scales',type=int,default=3,help='number of scales')
-parser.add_argument('--point_scales_list',type=list,default=[2232,1500,768],help='number of points in each scales')
+parser.add_argument('--point_scales_list',type=list,default=[4000,2000,1000],help='number of points in each scales')
 parser.add_argument('--each_scales_size',type=int,default=1,help='each scales size')
 parser.add_argument('--wtl2',type=float,default=0.95,help='0 means do not use else use with this weight')
 parser.add_argument('--cropmethod', default = 'random_center', help = 'random|center|random_center')
 opt = parser.parse_args()
 # print(opt)
 
-blue = lambda x: '\033[94m' + x + '\033[0m'
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 USE_CUDA = True
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 point_netG = _netG(opt.num_scales,opt.each_scales_size,opt.point_scales_list,opt.crop_point_num)
@@ -115,7 +112,7 @@ if opt.cuda:
     torch.cuda.manual_seed_all(opt.manualSeed)
 
 
-dset = own_loader.my_LoadData("/home/zjh/workspace/PFNet/dataset/own_dataset_processed", "train")
+dset = own_loader.my_LoadData("/home/zjh/workspace/workspace-git/PFNet/dataset/test_dataset_processed", "train")
 assert dset
 dataloader = torch.utils.data.DataLoader(dset, batch_size=opt.batchSize,
                                          shuffle=True,num_workers = int(opt.workers))
@@ -133,8 +130,8 @@ criterion = torch.nn.BCEWithLogitsLoss().to(device)
 criterion_PointLoss = PointLoss().to(device)
 
 # setup optimizer
-optimizerD = torch.optim.Adam(point_netD.parameters(), lr=0.0001,betas=(0.9, 0.999),eps=1e-05,weight_decay=opt.weight_decay)
-optimizerG = torch.optim.Adam(point_netG.parameters(), lr=0.0001,betas=(0.9, 0.999),eps=1e-05 ,weight_decay=opt.weight_decay)
+optimizerD = torch.optim.Adam(point_netD.parameters(), lr=0.001,betas=(0.9, 0.999),eps=1e-05,weight_decay=opt.weight_decay)
+optimizerG = torch.optim.Adam(point_netG.parameters(), lr=0.001,betas=(0.9, 0.999),eps=1e-05 ,weight_decay=opt.weight_decay)
 schedulerD = torch.optim.lr_scheduler.StepLR(optimizerD, step_size=40, gamma=0.2)
 schedulerG = torch.optim.lr_scheduler.StepLR(optimizerG, step_size=40, gamma=0.2)
 
@@ -152,20 +149,16 @@ num_batch = len(dset) / opt.batchSize
 ##########################  
 if opt.D_choose == 1:
     for epoch in range(resume_epoch,opt.niter):
-        EPOCH_CD_LOOS = []
-        EPOCH_D_LOSS = []
-        EPOCH_G_LOSS = []
-        # if epoch<30:
-        #     alpha1 = 0.01
-        #     alpha2 = 0.02
-        # elif epoch<80:
-        #     alpha1 = 0.05
-        #     alpha2 = 0.1
-        # else:
-        #     alpha1 = 0.1
-        #     alpha2 = 0.2
-        alpha1 = 0.1
-        alpha2 = 0.2
+
+        if epoch<30:
+            alpha1 = 0.01
+            alpha2 = 0.02
+        elif epoch<80:
+            alpha1 = 0.05
+            alpha2 = 0.1
+        else:
+            alpha1 = 0.1
+            alpha2 = 0.2
         _epoch_cd_loss = 0
         _epoch_d_loss = 0
         _epoch_g_loss = 0
@@ -242,6 +235,7 @@ if opt.D_choose == 1:
             ###########################        
             point_netD.zero_grad()
             real_center = torch.unsqueeze(real_center,1)  
+            # print("REAL_CENTER: ", real_center.shape)
             output = point_netD(real_center)
             errD_real = criterion(output,label)
             errD_real.backward()
@@ -250,6 +244,7 @@ if opt.D_choose == 1:
             label.data.fill_(fake_label)
             output = point_netD(fake.detach())
             errD_fake = criterion(output, label)
+            # torch.autograd.set_detect_anomaly(True)
             errD_fake.backward()
             # print("ERRD_REAL:", errD_real, " ERRED_FAKE:", errD_fake)
             errD = errD_real + errD_fake
@@ -262,41 +257,40 @@ if opt.D_choose == 1:
             output = point_netD(fake)
             errG_D = criterion(output, label)
             errG_l2 = 0
-            # CD_LOSS = criterion_PointLoss(torch.squeeze(fake,1),torch.squeeze(real_center,1))
+            CD_LOSS = criterion_PointLoss(torch.squeeze(fake,1),torch.squeeze(real_center,1))
             
             # print(fake.shape, real_center.shape)
-            dist1, dist2, idx1, idx2 = chamLoss(torch.squeeze(fake,1), torch.squeeze(real_center,1))
-            batch_cd_loss = (torch.sqrt(dist1).mean(1) + torch.sqrt(dist2).mean(1)) / 2  # cd_p
-            CD_LOSS = torch.mean(batch_cd_loss)
-            CD_LOSS = CD_LOSS * 100
-            # errG_l2 = chamLoss(torch.squeeze(fake,1),torch.squeeze(real_center,1))\
-            # +alpha1*chamLoss(fake_center1,real_center_key1)\
-            # +alpha2*chamLoss(fake_center2,real_center_key2)
+            # dist1, dist2, idx1, idx2 = chamLoss(torch.squeeze(fake,1), torch.squeeze(real_center,1))
+            # batch_cd_loss = (torch.sqrt(dist1).mean(1) + torch.sqrt(dist2).mean(1)) / 2  # cd_p
+            # CD_LOSS = torch.mean(batch_cd_loss)
+            # CD_LOSS = CD_LOSS * 100
+            errG_l2 = criterion_PointLoss(torch.squeeze(fake,1),torch.squeeze(real_center,1))\
+            +alpha1*criterion_PointLoss(fake_center1,real_center_key1)\
+            +alpha2*criterion_PointLoss(fake_center2,real_center_key2)
             
-            dist1_l1, dist2_l1, idx1_l1, idx2_l1 = chamLoss(fake_center1,real_center_key1)
-            batch_cd_loss_l1 = (torch.sqrt(dist1_l1).mean(1) + torch.sqrt(dist2_l1).mean(1)) / 2
-            errG_l1 = torch.mean(batch_cd_loss_l1)
-            errG_l1 = errG_l1 * alpha1 * 100
+            # dist1_l1, dist2_l1, idx1_l1, idx2_l1 = chamLoss(fake_center1,real_center_key1)
+            # batch_cd_loss_l1 = (torch.sqrt(dist1_l1).mean(1) + torch.sqrt(dist2_l1).mean(1)) / 2
+            # errG_l1 = torch.mean(batch_cd_loss_l1)
+            # errG_l1 = errG_l1 * alpha1 * 100
             
-            dist1_l2, dist2_l2, idx1_l2, idx2_l2 = chamLoss(fake_center2,real_center_key2)
-            batch_cd_loss_l2 = (torch.sqrt(dist1_l2).mean(1) + torch.sqrt(dist2_l2).mean(1)) / 2
-            errG_l2 = torch.mean(batch_cd_loss_l2)
-            errG_l2 = errG_l2 * alpha2 * 100
-            # errG_l1 = torch.mean(chamLoss(fake_center1,real_center_key1)) * 100 * alpha1
-            # errG_l2 = torch.mean(chamLoss(fake_center2,real_center_key2)) * 100 * alpha2
+            # dist1_l2, dist2_l2, idx1_l2, idx2_l2 = chamLoss(fake_center2,real_center_key2)
+            # batch_cd_loss_l2 = (torch.sqrt(dist1_l2).mean(1) + torch.sqrt(dist2_l2).mean(1)) / 2
+            # errG_l2 = torch.mean(batch_cd_loss_l2)
+            # errG_l2 = errG_l2 * alpha2 * 100
+
             
-            errG_total_cd = CD_LOSS + errG_l1 + errG_l2
+            # errG_total_cd = CD_LOSS + errG_l1 + errG_l2
             
-            errG = (1 - opt.wtl2) * errG_D + opt.wtl2 * errG_total_cd
+            errG = (1 - opt.wtl2) * errG_D + opt.wtl2 * errG_l2
             errG.backward()
             optimizerG.step()
             print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f / %.4f / %.4f/ %.4f'
                   % (epoch, opt.niter, i, len(dataloader), 
-                     errD.data, errG_D.data,errG_total_cd,errG,CD_LOSS))
-            f=open('loss_PFNet_2.txt','a')
+                     errD.data, errG_D.data,errG_l2,errG,CD_LOSS))
+            f=open('checkpoint/Trained_Model_8/loss_PFNet_8.txt','a')
             f.write('\n'+'[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f / %.4f / %.4f /%.4f'
                   % (epoch, opt.niter, i, len(dataloader), 
-                     errD.data, errG_D.data,errG_total_cd,errG,CD_LOSS))
+                     errD.data, errG_D.data,errG_l2,errG,CD_LOSS))
             
             _epoch_cd_loss += CD_LOSS
             _epoch_d_loss += errD.data
@@ -360,12 +354,14 @@ if opt.D_choose == 1:
         
         schedulerD.step()
         schedulerG.step()
+        
         if epoch% 50 == 0:   
+            print("============SAVE MODEL==============")
             torch.save({'epoch':epoch+1,
                         'state_dict':point_netG.state_dict()},
-                        'checkpoint/Trained_Model_2/point_netG'+str(epoch)+'.pth' )
+                        'checkpoint/Trained_Model_8/point_netG'+str(epoch)+'.pth' )
             torch.save({'epoch':epoch+1,
                         'state_dict':point_netD.state_dict()},
-                        'checkpoint/Trained_Model_2/point_netD'+str(epoch)+'.pth' )  
-            
+                        'checkpoint/Trained_Model_8/point_netD'+str(epoch)+'.pth' )  
+            print("====================================")
     

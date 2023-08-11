@@ -79,6 +79,6 @@ class my_LoadData(data.Dataset):
         
 
 if __name__ == "__main__":
-    dataloader = my_LoadData("/home/zjh/workspace/PFNet/dataset/own_dataset_processed", "train")
+    dataloader = my_LoadData("/home/zjh/workspace/workspace-git/PFNet/dataset/test_dataset_processed", "train")
     
-    print(len(dataloader))
+    print(dataloader[30])

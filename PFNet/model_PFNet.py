@@ -169,6 +169,149 @@ class _netG(nn.Module):
         pc3_xyz = pc3_xyz.reshape(-1,self.crop_point_num,3) 
         
         return pc1_xyz,pc2_xyz,pc3_xyz #center1 ,center2 ,fine
+    
+# class ResidualBlock(nn.Module):
+#     def __init__(self, in_channels, out_channels, kernel_size):
+#         super().__init__()
+#         self.conv = nn.Conv2d(in_channels, out_channels, kernel_size)
+#         self.bn = nn.BatchNorm2d(out_channels)
+#         self.relu = nn.ReLU()
+#         self.shortcut = nn.Sequential()
+        
+#         if in_channels != out_channels:
+#             # print(in_channels,out_channels)
+#             self.shortcut = nn.Sequential(
+#                 nn.Conv2d(in_channels, out_channels, (1, 3)),
+#                 nn.BatchNorm2d(out_channels)
+#             )
+
+#     def forward(self, x):
+#         out = self.relu(self.bn(self.conv(x)))
+#         # print(out.shape)
+#         # print(self.shortcut(x).shape)
+#         out = out + self.shortcut(x)
+#         return out
+    
+# class AttentionBlock(nn.Module):
+#     def __init__(self, in_channels):
+#         super().__init__()
+#         # 定义三个卷积层，分别用于生成查询、键和值
+#         self.conv1 = nn.Conv2d(in_channels, in_channels // 8, 1)
+#         self.conv2 = nn.Conv2d(in_channels, in_channels // 8, 1)
+#         self.conv3 = nn.Conv2d(in_channels, in_channels, 1)
+#         # 定义一个softmax函数，用于计算注意力权重
+#         self.softmax = nn.Softmax(dim=-1)
+
+#     def forward(self, x):
+#         # print("-"*40)
+#         # 将输入通过第一个卷积层，得到查询
+#         # print("inputX: ", x.shape) # x [1 64 512 1]
+#         q = self.conv1(x) # query
+#         # 将输入通过第二个卷积层，得到键
+#         k = self.conv2(x) # key
+#         # 将输入通过第三个卷积层，得到值
+#         v = self.conv3(x) # value
+#         # 获取输入的形状信息，包括批次大小、通道数、高度和宽度
+#         # print("q,k,v", q.shape, k.shape, v.shape)  # [1 8 512 1] [1 8 521 1] [1 64 512 1]
+#         b, c, h, w = q.shape
+#         # print("B,C,H,W", b,c,h,w)  # 1 8 512 1
+#         # 将查询变形为（批次大小、通道数、高度*宽度）
+#         q = q.view(b, c, -1) # (b, c, h*w)
+#         # print("218Q: ", q.shape)  # [1, 8, 512]
+#         # 将键变形为（批次大小、高度*宽度、通道数），并交换第二维和第三维
+#         k = k.view(b, c, -1).permute(0, 2, 1) # (b, h*w, c)
+#         # print("221Q: ", k.shape)  #  [1, 512, 8]
+#         # 将查询和键进行矩阵乘法，得到注意力分数（批次大小、通道数、通道数）
+#         a = torch.bmm(k, q) # (b, c, c)
+#         # print("224A: ", a.shape)  # [1, 8, 8]
+#         # 将注意力分数通过softmax函数，得到注意力权重（注意力图）
+#         a = self.softmax(a) # attention map
+#         # print("227A: ", a.shape)  # [1, 8, 8]
+#         # 将值变形为（批次大小、通道数*高度*宽度）
+#         v = v.view(b, -1, h*w) # (b, c*h*w)
+#         # print("230V: ", v.shape)  # [1, 64, 512]
+#         # 将值和注意力权重进行矩阵乘法，得到注意力输出（批次大小、通道数*高度*宽度、通道数）
+#         o = torch.bmm(v, a) # (b, c*h*w, c)
+#         # print("233o: ", o.shape)
+#         # 将注意力输出变形为（批次大小、通道数*高度*宽度、高度、宽度）
+#         o = o.view(b, -1, h, w) # (b, c*h*w, h, w)
+#         # print("237o: ", o.shape)
+#         # 返回注意力输出
+#         return o
+    
+# class _netlocalD(nn.Module):
+#     def __init__(self,crop_point_num):
+#         super(_netlocalD,self).__init__()
+#         self.crop_point_num = crop_point_num
+#         # use residual blocks instead of convolutions
+#         self.res1 = ResidualBlock(1, 64, 1)
+#         self.res2 = ResidualBlock(64, 64, 1)
+#         self.res3 = ResidualBlock(64, 128, 1)
+#         self.res4 = ResidualBlock(128, 256, 1)
+#         # use attention blocks instead of batch normalization
+#         self.att1 = AttentionBlock(64)
+#         self.att2 = AttentionBlock(64)
+#         self.att3 = AttentionBlock(128)
+#         self.att4 = AttentionBlock(256)
+#         # use max pooling as before
+#         self.maxpool = torch.nn.MaxPool2d((self.crop_point_num, 1), 1)
+#         # use fully connected layers as before
+#         self.fc1 = nn.Linear(448,256)
+#         self.fc2 = nn.Linear(256,128)
+#         self.fc3 = nn.Linear(128,16)
+#         self.fc4 = nn.Linear(16,1)
+#         # use batch normalization as before
+#         self.bn_1 = nn.BatchNorm1d(256)
+#         self.bn_2 = nn.BatchNorm1d(128)
+#         self.bn_3 = nn.BatchNorm1d(16)
+#         # use dropout to prevent overfitting
+#         self.dropout_1 = nn.Dropout(0.5)
+#         self.dropout_2 = nn.Dropout(0.5)
+#         self.dropout_3 = nn.Dropout(0.5)
+
+#     def forward(self, x):
+#         # print("self.res1(x):", x.shape)
+#         x = F.relu(self.att1(self.res1(x)))
+#         # print("X1: ", x.shape)
+#         x_64 = F.relu(self.att2(self.res2(x)))
+#         # print("X_64: ",x_64.shape)
+#         x_128 = F.relu(self.att3(self.res3(x_64)))
+#         # print("X_128: ",x_64.shape)
+#         x_256 = F.relu(self.att4(self.res4(x_128)))
+#         # print("X_256: ",x_64.shape)
+
+        
+#         # print("self.maxpool(x_64)", self.maxpool(x_64).shape)
+#         x_64 = torch.squeeze(self.maxpool(x_64))
+#         # print("self.maxpool(x_64)", x_64.shape)
+
+#         # print("self.maxpool(x_128)", self.maxpool(x_128).shape)
+#         x_128 = torch.squeeze(self.maxpool(x_128))        
+#         # print("self.maxpool(x_128)", x_128.shape)
+
+#         # print("self.maxpool(x_256)", self.maxpool(x_256).shape)
+#         x_256 = torch.squeeze(self.maxpool(x_256))
+#         # print("self.maxpool(x_256)", x_256.shape)
+
+#         Layers = [x_256,x_128,x_64]
+#         x = torch.cat(Layers,1)
+#         # print("298x: ",x.shape)
+#         x = x[:, :, 0].clone()
+#         # print("300x: ",x.shape)
+#         # print("self.fc1(x))", self.fc1(x).shape)
+#         x = F.relu(self.bn_1(self.fc1(x)))
+#         # print("303x: ",x.shape)
+#         x = self.dropout_1(x)
+#         x = F.relu(self.bn_2(self.fc2(x)))
+#         # print("306x: ",x.shape)
+#         x = self.dropout_2(x)
+#         x = F.relu(self.bn_3(self.fc3(x)))
+#         # print("309x: ",x.shape)
+#         x = self.dropout_3(x)
+#         x = self.fc4(x)
+#         # print("312x: ",x.shape)
+#         return x
+
 
 class _netlocalD(nn.Module):
     def __init__(self,crop_point_num):
@@ -208,10 +351,35 @@ class _netlocalD(nn.Module):
         return x
 
 if __name__=='__main__':
-    input1 = torch.randn(64,2048,3)
-    input2 = torch.randn(64,512,3)
-    input3 = torch.randn(64,256,3)
-    input_ = [input1,input2,input3]
-    netG=_netG(3,1,[2048,512,256],1024)
-    output = netG(input_)
-    print(output)
+    # input1 = torch.randn(64,2048,3)
+    input2 = torch.randn(2, 1, 512, 3)
+    # input3 = torch.randn(64,256,3)
+    # input_ = [input1,input2,input3]
+    
+    # output = netG(input_)
+    # print(output)
+    # res1 = ResidualBlock(1, 64, 1)
+    # res2 = ResidualBlock(64, 64, 1)
+    # res3 = ResidualBlock(64, 128, 1)
+    # res4 = ResidualBlock(128, 256, 1)
+    # # use attention blocks instead of batch normalization
+    # att1 = AttentionBlock(64)
+    # att2 = AttentionBlock(64)
+    # att3 = AttentionBlock(128)
+    # att4 = AttentionBlock(256)
+    
+    # x = F.relu(att1(res1(input2)))
+    
+    # x_64 = F.relu(att2(res2(x)))
+   
+    # x_128 = F.relu(att3(res3(x_64)))
+    
+    # x_256 = F.relu(att4(res4(x_128)))
+    # print("X1: ", x.shape)
+    # print("X_64: ",x_64.shape)
+    # print("X_128: ",x_64.shape)
+    # print("X_256: ",x_64.shape)
+    
+    netG=_netlocalD(512)
+    c = netG(input2).shape
+    print(c)

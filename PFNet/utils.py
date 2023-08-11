@@ -33,7 +33,7 @@ def chamfer_distance_numpy(array1, array2):
         av_dist1 = array2samples_distance(array1[i], array2[i])
         av_dist2 = array2samples_distance(array2[i], array1[i])
         dist = dist + (0.5*av_dist1+0.5*av_dist2)/batch_size
-    return dist*1000
+    return dist*100
 
 def chamfer_distance_numpy_test(array1, array2):
     batch_size, num_point, num_features = array1.shape
