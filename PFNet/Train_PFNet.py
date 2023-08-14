@@ -15,9 +15,9 @@ import own_loader
 from model_PFNet import _netlocalD,_netG
 import numpy as np
 from visdom import Visdom
-from tools.chamfer3D import dist_chamfer_3D
+# from tools.chamfer3D import dist_chamfer_3D
 
-chamLoss = dist_chamfer_3D.chamfer_3DDist()
+# chamLoss = dist_chamfer_3D.chamfer_3DDist()
 
 vis_cd = Visdom()
 vis_d = Visdom()
@@ -42,7 +42,7 @@ vis_g.line([0.], # Y的第一个点的坐标
 )
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataroot',  default='dataset/train', help='path to dataset')
+parser.add_argument('--dataroot',  default='dataset/test_dataset_processed', help='path to dataset')
 parser.add_argument('--workers', type=int,default=0, help='number of data loading workers')
 parser.add_argument('--batchSize', type=int, default=5, help='input batch size')
 parser.add_argument('--pnum', type=int, default=4000, help='the point number of a sample')
@@ -52,21 +52,20 @@ parser.add_argument('--niter', type=int, default=801, help='number of epochs to 
 parser.add_argument('--weight_decay', type=float, default=0.0001)
 parser.add_argument('--learning_rate', default=0.001, type=float, help='learning rate in training')
 parser.add_argument('--beta1', type=float, default=0.9, help='beta1 for adam. default=0.9')
-parser.add_argument('--cuda', type = bool, default = False, help='enables cuda')
 parser.add_argument('--ngpu', type=int, default=2, help='number of GPUs to use')
 parser.add_argument('--D_choose',type=int, default=1, help='0 not use D-net,1 use D-net')
 parser.add_argument('--netG', default='', help="fuck you")
 parser.add_argument('--netD', default='', help="fuck")
 parser.add_argument('--manualSeed', type=int, help='manual seed')
-parser.add_argument('--drop',type=float,default=0.2)
 parser.add_argument('--num_scales',type=int,default=3,help='number of scales')
 parser.add_argument('--point_scales_list',type=list,default=[4000,2000,1000],help='number of points in each scales')
 parser.add_argument('--each_scales_size',type=int,default=1,help='each scales size')
 parser.add_argument('--wtl2',type=float,default=0.95,help='0 means do not use else use with this weight')
-parser.add_argument('--cropmethod', default = 'random_center', help = 'random|center|random_center')
 opt = parser.parse_args()
 # print(opt)
 
+
+# ------------------------------ PREPARE ----------------------------------
 USE_CUDA = True
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 point_netG = _netG(opt.num_scales,opt.each_scales_size,opt.point_scales_list,opt.crop_point_num)
@@ -102,7 +101,8 @@ if opt.netD != '' :
     point_netD.load_state_dict(torch.load(opt.netD,map_location=lambda storage, location: storage)['state_dict'])
     resume_epoch = torch.load(opt.netD)['epoch']
 
-        
+
+# -------------- SET SEED ----------------
 if opt.manualSeed is None:
     opt.manualSeed = random.randint(1, 10000)
 print("Random Seed: ", opt.manualSeed)
@@ -112,7 +112,8 @@ if opt.cuda:
     torch.cuda.manual_seed_all(opt.manualSeed)
 
 
-dset = own_loader.my_LoadData("/home/zjh/workspace/workspace-git/PFNet/dataset/test_dataset_processed", "train")
+# ---------------------- SET DATALOADER ----------------------------------
+dset = own_loader.my_LoadData(opt.dataroot, "train")
 assert dset
 dataloader = torch.utils.data.DataLoader(dset, batch_size=opt.batchSize,
                                          shuffle=True,num_workers = int(opt.workers))
@@ -122,16 +123,16 @@ print("DATASET LEN :", len(dset))
 # test_dataloader = torch.utils.data.DataLoader(test_dset, batch_size=opt.batchSize,
 #                                          shuffle=True,num_workers = int(opt.workers))
 
-#pointcls_net.apply(weights_init)
 # print(point_netG)
 # print(point_netD)
+
 
 criterion = torch.nn.BCEWithLogitsLoss().to(device)
 criterion_PointLoss = PointLoss().to(device)
 
 # setup optimizer
-optimizerD = torch.optim.Adam(point_netD.parameters(), lr=0.001,betas=(0.9, 0.999),eps=1e-05,weight_decay=opt.weight_decay)
-optimizerG = torch.optim.Adam(point_netG.parameters(), lr=0.001,betas=(0.9, 0.999),eps=1e-05 ,weight_decay=opt.weight_decay)
+optimizerD = torch.optim.Adam(point_netD.parameters(), lr=opt.learning_rate,betas=(0.9, 0.999),eps=1e-05,weight_decay=opt.weight_decay)
+optimizerG = torch.optim.Adam(point_netG.parameters(), lr=opt.learning_rate,betas=(0.9, 0.999),eps=1e-05 ,weight_decay=opt.weight_decay)
 schedulerD = torch.optim.lr_scheduler.StepLR(optimizerD, step_size=40, gamma=0.2)
 schedulerG = torch.optim.lr_scheduler.StepLR(optimizerG, step_size=40, gamma=0.2)
 
@@ -223,8 +224,6 @@ if opt.D_choose == 1:
             input_cropped2 = input_cropped2.to(device)
             input_cropped3 = input_cropped3.to(device)      
             
-            
-            
             input_cropped  = [input_cropped1,input_cropped2,input_cropped3]
             # print("INPUT_CRO.PPED:", input_cropped[0].shape, "---", input_cropped[1].shape, "---",input_cropped[2].shape)
                   
@@ -258,15 +257,16 @@ if opt.D_choose == 1:
             errG_D = criterion(output, label)
             errG_l2 = 0
             CD_LOSS = criterion_PointLoss(torch.squeeze(fake,1),torch.squeeze(real_center,1))
+        
+            errG_l2 = criterion_PointLoss(torch.squeeze(fake,1),torch.squeeze(real_center,1))\
+            +alpha1*criterion_PointLoss(fake_center1,real_center_key1)\
+            +alpha2*criterion_PointLoss(fake_center2,real_center_key2)
             
-            # print(fake.shape, real_center.shape)
+            # ------------------------ CHANGE THE WAY TO CALU CD -----------------------------
             # dist1, dist2, idx1, idx2 = chamLoss(torch.squeeze(fake,1), torch.squeeze(real_center,1))
             # batch_cd_loss = (torch.sqrt(dist1).mean(1) + torch.sqrt(dist2).mean(1)) / 2  # cd_p
             # CD_LOSS = torch.mean(batch_cd_loss)
             # CD_LOSS = CD_LOSS * 100
-            errG_l2 = criterion_PointLoss(torch.squeeze(fake,1),torch.squeeze(real_center,1))\
-            +alpha1*criterion_PointLoss(fake_center1,real_center_key1)\
-            +alpha2*criterion_PointLoss(fake_center2,real_center_key2)
             
             # dist1_l1, dist2_l1, idx1_l1, idx2_l1 = chamLoss(fake_center1,real_center_key1)
             # batch_cd_loss_l1 = (torch.sqrt(dist1_l1).mean(1) + torch.sqrt(dist2_l1).mean(1)) / 2
@@ -287,7 +287,7 @@ if opt.D_choose == 1:
             print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f / %.4f / %.4f/ %.4f'
                   % (epoch, opt.niter, i, len(dataloader), 
                      errD.data, errG_D.data,errG_l2,errG,CD_LOSS))
-            f=open('checkpoint/Trained_Model_8/loss_PFNet_8.txt','a')
+            f=open('checkpoint/Trained_Model_9/loss_PFNet_9.txt','a')
             f.write('\n'+'[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f / %.4f / %.4f /%.4f'
                   % (epoch, opt.niter, i, len(dataloader), 
                      errD.data, errG_D.data,errG_l2,errG,CD_LOSS))
@@ -359,9 +359,9 @@ if opt.D_choose == 1:
             print("============SAVE MODEL==============")
             torch.save({'epoch':epoch+1,
                         'state_dict':point_netG.state_dict()},
-                        'checkpoint/Trained_Model_8/point_netG'+str(epoch)+'.pth' )
+                        'checkpoint/Trained_Model_9/point_netG'+str(epoch)+'.pth' )
             torch.save({'epoch':epoch+1,
                         'state_dict':point_netD.state_dict()},
-                        'checkpoint/Trained_Model_8/point_netD'+str(epoch)+'.pth' )  
+                        'checkpoint/Trained_Model_9/point_netD'+str(epoch)+'.pth' )  
             print("====================================")
     
