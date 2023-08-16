@@ -1,4 +1,5 @@
 import os
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import sys
 import argparse
 import random
@@ -15,13 +16,20 @@ import own_loader
 from model_PFNet import _netlocalD,_netG
 import numpy as np
 from visdom import Visdom
-# from tools.chamfer3D import dist_chamfer_3D
+from tools.chamfer3D import dist_chamfer_3D
 
-# chamLoss = dist_chamfer_3D.chamfer_3DDist()
+chamLoss = dist_chamfer_3D.chamfer_3DDist()
+
+Experiment_number = 10
+
+
+folder_path = f'checkpoint/Trained_Model_{Experiment_number}'
+os.makedirs(folder_path, exist_ok=True)
 
 vis_cd = Visdom()
 vis_d = Visdom()
 vis_g = Visdom()
+vis_val = Visdom()
 
 vis_cd.line([0.], # Y的第一个点的坐标
           [0.], # X的第一个点的坐标
@@ -41,10 +49,15 @@ vis_g.line([0.], # Y的第一个点的坐标
           opts = dict(title = 'vis_g'),  # 图像的标例,
 )
 
+vis_val.line([0.], # Y的第一个点的坐标
+          [0.], # X的第一个点的坐标
+          win = 'vis_val', # 窗口的名称
+          opts = dict(title = 'vis_val'),  # 图像的标例,
+)
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataroot',  default='dataset/test_dataset_processed', help='path to dataset')
 parser.add_argument('--workers', type=int,default=0, help='number of data loading workers')
-parser.add_argument('--batchSize', type=int, default=5, help='input batch size')
+parser.add_argument('--batchSize', type=int, default=4, help='input batch size')
 parser.add_argument('--pnum', type=int, default=4000, help='the point number of a sample')
 parser.add_argument('--crop_point_num',type=int,default=768,help='0 melearning_ratelrrans do not use else use with this weight')
 parser.add_argument('--nc', type=int, default=3)
@@ -54,8 +67,9 @@ parser.add_argument('--learning_rate', default=0.001, type=float, help='learning
 parser.add_argument('--beta1', type=float, default=0.9, help='beta1 for adam. default=0.9')
 parser.add_argument('--ngpu', type=int, default=2, help='number of GPUs to use')
 parser.add_argument('--D_choose',type=int, default=1, help='0 not use D-net,1 use D-net')
-parser.add_argument('--netG', default='', help="fuck you")
-parser.add_argument('--netD', default='', help="fuck")
+parser.add_argument('--netG', default='', help="")
+parser.add_argument('--netD', default='', help="")
+parser.add_argument('--cuda', type = bool, default = False, help='enables cuda')
 parser.add_argument('--manualSeed', type=int, help='manual seed')
 parser.add_argument('--num_scales',type=int,default=3,help='number of scales')
 parser.add_argument('--point_scales_list',type=list,default=[4000,2000,1000],help='number of points in each scales')
@@ -118,10 +132,11 @@ assert dset
 dataloader = torch.utils.data.DataLoader(dset, batch_size=opt.batchSize,
                                          shuffle=True,num_workers = int(opt.workers))
 
-print("DATASET LEN :", len(dset))
-# test_dset = shapenet_part_loader.PartDataset( root='./dataset/dataset/',classification=True, class_choice=None, npoints=opt.pnum, split='test')
-# test_dataloader = torch.utils.data.DataLoader(test_dset, batch_size=opt.batchSize,
-#                                          shuffle=True,num_workers = int(opt.workers))
+print("TRAINED DATASET LEN :", len(dset))
+test_dset = own_loader.my_LoadData(opt.dataroot, "val")
+test_dataloader = torch.utils.data.DataLoader(test_dset, batch_size=opt.batchSize,
+                                         shuffle=True,num_workers = int(opt.workers))
+print("VAL DATASET LEN :", len(test_dset))
 
 # print(point_netG)
 # print(point_netD)
@@ -129,6 +144,8 @@ print("DATASET LEN :", len(dset))
 
 criterion = torch.nn.BCEWithLogitsLoss().to(device)
 criterion_PointLoss = PointLoss().to(device)
+
+# criterion_PointLoss_val = PointLoss().to(device)
 
 # setup optimizer
 optimizerD = torch.optim.Adam(point_netD.parameters(), lr=opt.learning_rate,betas=(0.9, 0.999),eps=1e-05,weight_decay=opt.weight_decay)
@@ -287,7 +304,7 @@ if opt.D_choose == 1:
             print('[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f / %.4f / %.4f/ %.4f'
                   % (epoch, opt.niter, i, len(dataloader), 
                      errD.data, errG_D.data,errG_l2,errG,CD_LOSS))
-            f=open('checkpoint/Trained_Model_9/loss_PFNet_9.txt','a')
+            f=open(f'checkpoint/Trained_Model_{Experiment_number}/loss_PFNet_{Experiment_number}.txt','a')
             f.write('\n'+'[%d/%d][%d/%d] Loss_D: %.4f Loss_G: %.4f / %.4f / %.4f /%.4f'
                   % (epoch, opt.niter, i, len(dataloader), 
                      errD.data, errG_D.data,errG_l2,errG,CD_LOSS))
@@ -301,57 +318,56 @@ if opt.D_choose == 1:
         vis_g.line([((_epoch_g_loss.cpu().detach().numpy())/len(dataloader))],[epoch],win = 'vis_g',update = 'append')
         
         print(f"============================FINSH {epoch} EPOCH===============================")
-            # if i % 10 ==0:
-            #     print('After, ',i,'-th batch')
-            #     f.write('\n'+'After, '+str(i)+'-th batch')
-            #     for i, data in enumerate(test_dataloader, 0):
-            #         real_point, target = data
+        with torch.no_grad():
+            if epoch % 1 == 0:
+                print('After, ',str(epoch),'-th epoch')
+                f.write('\n'+'After, '+ str(epoch)+'-th epoch')
+                _epoch_val_loss = 0
+                for i, data_val in enumerate(test_dataloader, 0):
+                    partial_val, gt_val, labels_val = data_val
+                                
+                    input_cropped1_val = partial_val
+                    real_center_val = gt_val
+                                
+                    real_center_val = real_center.to(device)
+                    real_center_val = torch.squeeze(real_center_val,1)
                     
-            
-            #         batch_size = real_point.size()[0]
-            #         real_center = torch.FloatTensor(batch_size, 1, opt.crop_point_num, 3)
-            #         input_cropped1 = torch.FloatTensor(batch_size, opt.pnum, 3)
-            #         input_cropped1 = input_cropped1.data.copy_(real_point)
-            #         real_point = torch.unsqueeze(real_point, 1)
-            #         input_cropped1 = torch.unsqueeze(input_cropped1,1)
+                    input_cropped1_val = input_cropped1_val.to(device)
+                    input_cropped1_val = torch.squeeze(input_cropped1_val,1) # ([2, 2048, 3])
+
+                    # print("输入:", input_cropped1.shape)
                     
-            #         p_origin = [0,0,0]
+                    input_cropped2_idx_val = utils.farthest_point_sample(input_cropped1_val,opt.point_scales_list[1],RAN = True) 
+                    input_cropped2_val     = utils.index_points(input_cropped1_val,input_cropped2_idx_val)  # ([2, 1024, 3])
+                    # print("经过1次采样的输入:", input_cropped2.shape)
                     
-            #         if opt.cropmethod == 'random_center':
-            #             choice = [torch.Tensor([1,0,0]),torch.Tensor([0,0,1]),torch.Tensor([1,0,1]),torch.Tensor([-1,0,0]),torch.Tensor([-1,1,0])]
-                        
-            #             for m in range(batch_size):
-            #                 index = random.sample(choice,1)
-            #                 distance_list = []
-            #                 p_center = index[0]
-            #                 for n in range(opt.pnum):
-            #                     distance_list.append(distance_squre(real_point[m,0,n],p_center))
-            #                 distance_order = sorted(enumerate(distance_list), key  = lambda x:x[1])                         
-            #                 for sp in range(opt.crop_point_num):
-            #                     input_cropped1.data[m,0,distance_order[sp][0]] = torch.FloatTensor([0,0,0])
-            #                     real_center.data[m,0,sp] = real_point[m,0,distance_order[sp][0]]  
-            #         real_center = real_center.to(device)
-            #         real_center = torch.squeeze(real_center,1)
-            #         input_cropped1 = input_cropped1.to(device) 
-            #         input_cropped1 = torch.squeeze(input_cropped1,1)
-            #         input_cropped2_idx = utils.farthest_point_sample(input_cropped1,opt.point_scales_list[1],RAN = True)
-            #         input_cropped2     = utils.index_points(input_cropped1,input_cropped2_idx)
-            #         input_cropped3_idx = utils.farthest_point_sample(input_cropped1,opt.point_scales_list[2],RAN = False)
-            #         input_cropped3     = utils.index_points(input_cropped1,input_cropped3_idx)
-            #         input_cropped1 = Variable(input_cropped1,requires_grad=False)
-            #         input_cropped2 = Variable(input_cropped2,requires_grad=False)
-            #         input_cropped3 = Variable(input_cropped3,requires_grad=False)
-            #         input_cropped2 = input_cropped2.to(device)
-            #         input_cropped3 = input_cropped3.to(device)      
-            #         input_cropped  = [input_cropped1,input_cropped2,input_cropped3]
-            #         point_netG.eval()
-            #         fake_center1,fake_center2,fake  =point_netG(input_cropped)
-            #         CD_loss = criterion_PointLoss(torch.squeeze(fake,1),torch.squeeze(real_center,1))
-            #         print('test result:',CD_loss)
-            #         f.write('\n'+'test result:  %.4f'%(CD_loss))
-            #         break
-            # f.close()
-        
+                    input_cropped3_idx_val = utils.farthest_point_sample(input_cropped1_val,opt.point_scales_list[2],RAN = False)
+                    input_cropped3_val     = utils.index_points(input_cropped1_val,input_cropped3_idx_val) # ([2, 512, 3])
+                    # print("经过2次采样的输入:", input_cropped3.shape)
+                    
+                    input_cropped1_val = Variable(input_cropped1_val,requires_grad=True)
+                    input_cropped2_val = Variable(input_cropped2_val,requires_grad=True)
+                    input_cropped3_val = Variable(input_cropped3_val,requires_grad=True)
+                    input_cropped2_val = input_cropped2_val.to(device)
+                    input_cropped3_val = input_cropped3_val.to(device)     
+                    input_cropped_val  = [input_cropped1_val,input_cropped2_val,input_cropped3_val]
+                    point_netG.eval()
+                    fake_center1_val,fake_center2_val,fake_val  =point_netG(input_cropped)
+                    CD_LOSS_VAL = criterion_PointLoss(torch.squeeze(fake_val,1),torch.squeeze(real_center_val,1))
+
+                    # dist1, dist2, idx1, idx2 = chamLoss(torch.squeeze(fake_val,1), torch.squeeze(real_center_val,1))
+                    # batch_cd_loss_val = (torch.sqrt(dist1).mean(1) + torch.sqrt(dist2).mean(1)) / 2  # cd_p
+                    # CD_LOSS_VAL = torch.mean(batch_cd_loss_val)
+                    # CD_LOSS_VAL = CD_LOSS_VAL * 100
+
+                    print(f'TEST {str(i)} RESULT:',CD_LOSS_VAL)
+                    
+                    _epoch_val_loss +=CD_LOSS_VAL
+                vis_val.line([((_epoch_val_loss.cpu().detach().numpy())/len(test_dataloader))],[epoch],win = 'vis_val',update = 'append')
+                f.write('\n'+'TEST RESULT:  %.4f'%(((_epoch_val_loss.cpu().detach().numpy())/len(test_dataloader))))
+                # f.write("\nsdsdsdsdsdwadswasdwa")
+            f.close()
+    
         schedulerD.step()
         schedulerG.step()
         
@@ -359,9 +375,8 @@ if opt.D_choose == 1:
             print("============SAVE MODEL==============")
             torch.save({'epoch':epoch+1,
                         'state_dict':point_netG.state_dict()},
-                        'checkpoint/Trained_Model_9/point_netG'+str(epoch)+'.pth' )
+                        f'checkpoint/Trained_Model_{Experiment_number}/point_netG'+str(epoch)+'.pth' )
             torch.save({'epoch':epoch+1,
                         'state_dict':point_netD.state_dict()},
-                        'checkpoint/Trained_Model_9/point_netD'+str(epoch)+'.pth' )  
-            print("====================================")
+                        f'checkpoint/Trained_Model_{Experiment_number}/point_netD'+str(epoch)+'.pth' )  
     
