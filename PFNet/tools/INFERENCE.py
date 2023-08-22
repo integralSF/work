@@ -18,17 +18,27 @@ import NORMALIZE
 # ----------PARSER FOR INFERENCE-------------
 model_num = '10'
 model_iter = '500'
-data_num = '99-27' # 60-24 62-26 140-45(MOYA)
-                    # 66-13 95-23 101-42(JIAYA)
+data_num = '97-25' # 60-24 62-26 140-45(MOYA)
+                    # 66-13 95-23 101-42(JIANYA)
 
-tooth_type = "MOYA"
+tooth_type = "MOYA" # JIANYA
+
+tooth_class_num = data_num.split("-")[1]
+
+if tooth_type == "MOYA":
+      tooth_class_ = "premolares" if tooth_class_num in ("14","15","24","25","34","35","44","45") else "molars"
+      class_num_ = "3" if tooth_class_=="premolares" else "4"
+else:
+      tooth_class_ = "incisor" if tooth_class_num in ("11", "12","21","22", "31","32","41", "42") else "canine"
+      class_num_ = "1" if tooth_class_=="incisor" else "2"
+
 
 parser = argparse.ArgumentParser()
 # ----------------------------------------INPUT FILE PATH-------------------------------------------------------
 parser.add_argument('--infile_real',type = str, default =
-                    f'dataset/test_dataset_processed/val/gt/4-molars/molars-gt-99-27.pts')
+                    f'dataset/test_dataset_processed/val/gt/{class_num_}-{tooth_class_}/{tooth_class_}-gt-{data_num}.pts')
 parser.add_argument('--infile',type = str, default = 
-                    f'dataset/test_dataset_processed/val/partial/4-molars/molars-partial-99-27.pts')
+                    f'dataset/test_dataset_processed/val/partial/{class_num_}-{tooth_class_}/{tooth_class_}-partial-{data_num}.pts')
 parser.add_argument('--netG', default=f'./checkpoint/Trained_Model_{model_num}/point_netG{model_iter}.pth', help="path to netG (to continue training)")
 
 
@@ -40,6 +50,8 @@ parser.add_argument('--point_scales_list',type=list,default=[4000,2000,1000],hel
 parser.add_argument('--each_scales_size',type=int,default=1,help='each scales size')
 opt = parser.parse_args()
 
+print("-------------------------")
+print(f"TEST NAME: {tooth_type} | {class_num_} | {tooth_class_} | {data_num}")
 
 # --------------------------PERPARE--------------------------------------
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -74,7 +86,6 @@ input_cropped  = [input_cropped1,input_cropped2,input_cropped3]
 # -------------------INPUT AND INFERENCE--------------------
 time1 = time.time()
 fake_center1,fake_center2,fake=point_netG(input_cropped)
-print("-------------------------")
 print("INFERENCE TIME: %.4f"%(time.time() - time1))
 
 # ---------PROCESS FAKE----------
@@ -100,7 +111,8 @@ np_real = real[0].detach().numpy()
 
 # ------------------------CALU THE CD LOSS----------------------------------
 CD_LOSS = criterion_PointLoss(torch.squeeze(fake,1),torch.squeeze(real,1))
-print("CD_LOSS: %.4f" % (CD_LOSS.item()),
+CD_LOSS = "%.4f" % (CD_LOSS.item())
+print("CD_LOSS: %f" % (CD_LOSS.item()),
       "\n-------------------------")
 
 
@@ -108,5 +120,5 @@ folder_path = f'test_one({tooth_type})/{model_num}'
 os.makedirs(folder_path, exist_ok=True)
 
 # --------------------------SVAE RESULT-------------------------------------
-np.savetxt(f'test_one({tooth_type})/{model_num}/{model_num}_{model_iter}_{data_num}_test_output_normalize_fake'+'.txt', np_fake, fmt = "%f %f %f")
-np.savetxt(f'test_one({tooth_type})/{model_num}/{model_num}_{model_iter}_{data_num}_test_output_normalize_real'+'.txt', np_real, fmt = "%f %f %f")
+np.savetxt(f'test_one({tooth_type})/{model_num}/{model_num}_{model_iter}_{data_num}_test_fake_cd_{CD_LOSS}'+'.txt', np_fake, fmt = "%f %f %f")
+np.savetxt(f'test_one({tooth_type})/{model_num}/{model_num}_{model_iter}_{data_num}_test_real'+'.txt', np_real, fmt = "%f %f %f")
